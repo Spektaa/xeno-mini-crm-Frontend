@@ -1,20 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
-
-/**
- * Xeno Mini-CRM – Campaign UI (React + Tailwind)
- *
- * Features:
- *  - Dynamic rule builder (AND across rows) for segmentRules
- *  - Audience preview (POST /api/v1/campaign/preview)
- *  - Campaign creation (POST /api/v1/campaign)
- *  - Campaign history (GET /api/v1/campaign), status (PATCH), delete (DELETE)
- */
+import { apiFetch } from "../utils/apifetch";
+import { CampaignHistory } from "../components/CampaignHistory";
 
 /****************************
  * Config / helpers
  ****************************/
-const API_BASE = "http://localhost:8000/api/v1"; // adjust if needed
 
 const ALLOWED_FIELDS = [
   { id: "totalSpend", label: "Total Spend" },
@@ -37,29 +28,21 @@ const ALLOWED_OPS = [
   { id: "$regex", label: "matches regex" },
 ];
 
-async function getAuthHeaders() {
-  try {
-    const token = await window?.Clerk?.session?.getToken();
-    if (token) return { Authorization: `Bearer ${token}` };
-  } catch {}
-  return {};
-}
-
-async function apiFetch(path, { method = "GET", body } = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...(await getAuthHeaders()),
-  };
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(txt || `HTTP ${res.status}`);
+/****************************
+ * NL → Rules: helper to convert rules JSON → builder rows
+ ****************************/
+function rulesToRows(rulesObj = {}) {
+  const rows = [];
+  for (const [field, spec] of Object.entries(rulesObj)) {
+    if (typeof spec !== "object" || Array.isArray(spec)) {
+      rows.push({ id: crypto.randomUUID(), field, op: "$eq", value: spec });
+      continue;
+    }
+    for (const [op, value] of Object.entries(spec)) {
+      rows.push({ id: crypto.randomUUID(), field, op, value });
+    }
   }
-  return res.json();
+  return rows;
 }
 
 /****************************
@@ -88,6 +71,70 @@ const toDateText = (v) => {
     return toText(v);
   }
 };
+
+
+/****************************
+ * parseNL rules
+ ****************************/
+
+// In CampaignUI.jsx (or wherever you build campaigns)
+
+function NaturalLanguageRules({ onParsed }) {
+  const [text, setText] = useState("");
+  const [useLLM, setuseLLM] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const parseNL = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const token = window.Clerk?.session ? await window.Clerk.session.getToken() : null;
+      const res = await fetch("https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/nl/segment-rules/parse", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text, useLLM })
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.message || "Failed to parse");
+      onParsed?.(json.rules);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-4 border shadow-sm bg-white/5">
+      <div className="text-sm font-medium mb-2">Describe your audience</div>
+      <textarea
+        className="w-full rounded-lg border p-3 bg-transparent"
+        rows={3}
+        placeholder={`e.g. People who haven’t shopped in 6 months and spent over ₹5K`}
+        value={text}
+        onChange={e => setText(e.target.value)}
+      />
+      <div className="flex items-center gap-3 mt-3">
+        {/* <label className="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={useLLM} onChange={e => setUseLLM(e.target.checked)} />
+          Use AI fallback (better coverage)
+        </label> */}
+        <button
+          onClick={parseNL}
+          disabled={loading || !text.trim()}
+          className="ml-auto px-3 py-2 rounded-xl border hover:shadow"
+        >
+          {loading ? "Parsing..." : "Parse to rules"}
+        </button>
+      </div>
+      {err && <div className="text-red-500 text-sm mt-2">{err}</div>}
+    </div>
+  );
+}
 
 /****************************
  * Rule Builder
@@ -123,7 +170,6 @@ function buildSegmentRules(rows) {
     } else if (typeof out[r.field] === "object" && !Array.isArray(out[r.field])) {
       out[r.field][r.op] = val;
     } else {
-      // convert existing primitive equality into $eq then append more ops
       const prev = out[r.field];
       out[r.field] = { $eq: prev, [r.op]: val };
     }
@@ -205,20 +251,58 @@ function RuleBuilder({ rows, setRows }) {
 function CreateCampaign() {
   const [rows, setRows] = useState([emptyRow()]);
   const [name, setName] = useState("");
-  const [message, setMessage] = useState("Hi {{name}}, here’s 10% off on your next order!");
+  const [message, setMessage] = useState("Hi, here’s 10% off on your next order!");
   const [createdBy, setCreatedBy] = useState("");
 
-  const {userId} = useAuth();
+  // === AI Suggestion State ===
+  const [objective, setObjective] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiVariants, setAiVariants] = useState([]); // [{headline, channel, copy}]
+
+  const { userId } = useAuth();
   const [preview, setPreview] = useState({ total: 0, customers: [], loading: false, err: "" });
   const [saving, setSaving] = useState(false);
   const segmentRules = useMemo(() => buildSegmentRules(rows), [rows]);
 
   useEffect(() => {
-    (async () => {
-      console.log("userere", userId);
-      if (userId) setCreatedBy(userId);
-    })();
+    if (userId) setCreatedBy(userId);
   }, [userId]);
+
+  // Fetch AI ideas from backend
+  const fetchAiIdeas = async () => {
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const res = await apiFetch("/ai/message-ideas", {
+        method: "POST",
+        body: {
+          objective: objective?.trim() || "Bring back inactive users",
+          audience: "users matching current segment rules",
+          brand: "Xeno Mini-CRM",
+          tone: "friendly, concise, action-oriented",
+        },
+      });
+      const list = Array.isArray(res?.variants) ? res.variants : [];
+      const top2 = list.slice(0, 2);
+      setAiVariants(top2);
+      return top2;
+    } catch (e) {
+      setAiError(e.message || "Failed to get suggestions");
+      setAiVariants([]);
+      return [];
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // One-click: fetch + auto-pick the top suggestion
+  const autoSuggestAndFill = async () => {
+    const ideas = await fetchAiIdeas();
+    if (ideas.length > 0 && ideas[0]?.copy) {
+      setMessage(ideas[0].copy);
+    }
+  };
 
   const doPreview = async () => {
     setPreview((p) => ({ ...p, loading: true, err: "" }));
@@ -280,16 +364,99 @@ function CreateCampaign() {
         </div>
       </div>
 
+      {/* === Message + AI Suggestions === */}
       <div className="space-y-2">
-        <label className="text-sm text-zinc-300">Message (supports {'{{name}}'})</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-zinc-300">Message</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={autoSuggestAndFill}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-1 text-sm"
+              disabled={aiLoading}
+              title="Fetch suggestions and auto-pick the top one"
+            >
+              {aiLoading ? "Suggesting…" : "Auto-Suggest"}
+            </button>
+          </div>
+        </div>
+
         <textarea
           rows={3}
           className="w-full rounded-2xl bg-zinc-900 border border-zinc-700 px-4 py-3"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
+
+        
+
+        {/* AI Objective + Variants Panel */}
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <label className="text-sm text-zinc-300">AI Objective</label>
+              <input
+                className="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2"
+                placeholder='e.g. "Bring back inactive users with a 10% offer"'
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={fetchAiIdeas}
+              className="mt-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 whitespace-nowrap"
+              disabled={aiLoading}
+            >
+              {aiLoading ? "Generating…" : "Generate Ideas"}
+            </button>
+          </div>
+
+          {!!aiError && <div className="text-sm text-red-400">{aiError}</div>}
+
+          {aiVariants.length > 0 && (
+            <div className="grid gap-2">
+              {aiVariants.map((v, i) => (
+                <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="text-xs uppercase text-zinc-400">{v.channel || "message"}</div>
+                  <div className="font-semibold">{v.headline || "Suggested copy"}</div>
+                  <p className="mt-1 text-sm whitespace-pre-wrap">{v.copy}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMessage(v.copy)}
+                      className="rounded-lg border border-zinc-700 px-2 py-1 text-sm"
+                    >
+                      Use this
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMessage((m) => (m ? m + "\n\n" + v.copy : v.copy))}
+                      className="rounded-lg border border-zinc-700 px-2 py-1 text-sm"
+                    >
+                      Append
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
+       <NaturalLanguageRules
+        onParsed={(rules) => {
+          const newRows = rulesToRows(rules);
+          // MERGE with existing rows (or replace by using: setRows(newRows))
+          setRows((prev) => [...prev, ...newRows]);
+        }}
+      />
+      {/* Optional: show the live JSON that will be sent to backend */}
+      {/* <pre className="mt-2 text-xs bg-zinc-900/60 border border-zinc-800 rounded-lg p-3 overflow-auto">
+        {JSON.stringify(segmentRules, null, 2)}
+      </pre> */}
+
+      {/* Audience Rules + Preview */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Audience Rules</h3>
@@ -304,14 +471,8 @@ function CreateCampaign() {
         <RuleBuilder rows={rows} setRows={setRows} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <h4 className="font-semibold mb-2">Segment JSON (sent to backend)</h4>
-          <pre className="text-xs bg-zinc-950/60 p-3 rounded-xl overflow-auto max-h-64">
-            {JSON.stringify(segmentRules, null, 2)}
-          </pre>
-        </div>
-
+      {/* Preview panel */}
+      <div className="grid grid-cols-1 gap-6">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="font-semibold">Preview</h4>
@@ -341,6 +502,7 @@ function CreateCampaign() {
         </div>
       </div>
 
+
       <div className="pt-2">
         <button
           type="button"
@@ -350,161 +512,6 @@ function CreateCampaign() {
         >
           {saving ? "Creating…" : "Create Campaign"}
         </button>
-      </div>
-    </div>
-  );
-}
-
-/****************************
- * Campaign History
- ****************************/
-function HistoryRow({ c, onStatus, onDelete }) {
-  const createdAt = c.createdAt ? new Date(c.createdAt).toLocaleString() : "";
-  const canRun = c.status === "draft";
-  const canComplete = c.status === "running";
-
-  return (
-    <tr className="border-b border-zinc-800">
-      <td className="px-4 py-3">{toText(c.name)}</td>
-      <td className="px-4 py-3 text-zinc-300">{c.status}</td>
-      <td className="px-4 py-3">{c.audienceSize}</td>
-      <td className="px-4 py-3">{createdAt}</td>
-      <td className="px-4 py-3">
-        <div className="flex gap-2">
-          {canRun && (
-            <button
-              onClick={() => onStatus(c._id, "running")}
-              className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3 py-1 text-sm"
-            >
-              Start
-            </button>
-          )}
-          {canComplete && (
-            <button
-              onClick={() => onStatus(c._id, "completed")}
-              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-1 text-sm"
-            >
-              Complete
-            </button>
-          )}
-          <button
-            onClick={() => onDelete(c._id)}
-            className="rounded-xl bg-zinc-800 hover:bg-zinc-700 px-3 py-1 text-sm"
-          >
-            Delete
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-function CampaignHistory() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiFetch(`/campaigns?page=${page}&limit=${limit}`);
-      setRows(res?.data || []);
-      setLoading(false);
-    } catch (e) {
-      setError(e.message || "Failed to load");
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, [page]);
-  useEffect(() => {
-    const handler = () => load();
-    window.addEventListener("xeno:refresh-history", handler);
-    return () => window.removeEventListener("xeno:refresh-history", handler);
-  }, []);
-
-  const changeStatus = async (id, status) => {
-    try {
-      await apiFetch(`/campaigns/${id}/status`, { method: "PATCH", body: { status } });
-      window.dispatchEvent(new CustomEvent("xeno:refresh-history"));
-    } catch (e) {
-      alert(e.message || "Failed to update status");
-    }
-  };
-
-  const del = async (id) => {
-    if (!confirm("Delete this campaign?")) return;
-    try {
-      await apiFetch(`/campaigns/${id}`, { method: "DELETE" });
-      window.dispatchEvent(new CustomEvent("xeno:refresh-history"));
-    } catch (e) {
-      alert(e.message || "Failed to delete");
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Campaign History</h3>
-        <div className="flex gap-2">
-          <button
-            className="rounded-xl bg-zinc-800 hover:bg-zinc-700 px-3 py-2"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Prev
-          </button>
-          <button
-            className="rounded-xl bg-zinc-800 hover:bg-zinc-700 px-3 py-2"
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-zinc-800 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-900">
-            <tr className="text-left">
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Audience</th>
-              <th className="px-4 py-3 font-medium">Created</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800">
-            {loading && (
-              <tr>
-                <td className="px-4 py-6" colSpan={5}>
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {error && !loading && (
-              <tr>
-                <td className="px-4 py-6 text-red-400" colSpan={5}>
-                  {error}
-                </td>
-              </tr>
-            )}
-            {!loading && !rows.length && !error && (
-              <tr>
-                <td className="px-4 py-6 text-zinc-500" colSpan={5}>
-                  No campaigns yet.
-                </td>
-              </tr>
-            )}
-            {rows.map((c) => (
-              <HistoryRow key={c._id} c={c} onStatus={changeStatus} onDelete={del} />
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

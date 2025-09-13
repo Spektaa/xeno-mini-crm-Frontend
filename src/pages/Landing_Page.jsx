@@ -1,5 +1,4 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
-import { useAuth } from "@clerk/clerk-react"
 import { ArrowRight, Sparkles, ShieldCheck, Bot, BarChart3 } from "lucide-react";
 import { Button } from "../components/button";
 import { Navbar } from "../components/Navbar";
