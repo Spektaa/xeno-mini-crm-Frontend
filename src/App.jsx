@@ -3,6 +3,7 @@ import LandingPage from "./pages/Landing_Page";
 import CampaignUI from "./pages/CampaignUI";
 import Dashboard from "./pages/Dashboard";
 import { useAuth } from "@clerk/clerk-react";
+import CustomersIngestPage from "./pages/CustomerIngestPage";
 
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -24,6 +25,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/ingest"
+          element={
+            <ProtectedRoute>
+              <CustomersIngestPage/>
             </ProtectedRoute>
           }
         />

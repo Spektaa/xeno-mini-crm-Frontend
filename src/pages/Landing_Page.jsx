@@ -39,28 +39,8 @@ function Hero() {
             Build segments, craft messages, and trigger sends. Auth is handled by Clerk, data by MongoDB, logic by Express/Node, and copy by OpenAI.
           </p>
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <SignedOut>
-              <SignUpButton mode="modal">
-                <Button className="h-11 px-6 bg-emerald-500 hover:bg-emerald-600">Create your account</Button>
-              </SignUpButton>
-              <SignInButton mode="modal">
-                <Button variant="outline" className="h-11 px-6 border-zinc-700 text-zinc-200 hover:text-white">I already have an account</Button>
-              </SignInButton>
-            </SignedOut>
-
-            <SignedIn>
-              <Link to="/dashboard">
-                <Button className="h-11 px-6 bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2">
-                  Go to dashboard <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </SignedIn>
-          </div>
-
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-400">
-            <li>OAuth via Google, GitHub, Email</li>
-            <li>Role-ready JWTs</li>
+            <li>OAuth via Google, Email</li>
             <li>Secure sessions & SSO</li>
           </ul>
         </div>
@@ -158,7 +138,7 @@ function Features() {
     {
       icon: Bot,
       title: "AI‑assisted content",
-      desc: "Generate on‑brand subject lines and copy with the OpenAI API.",
+      desc: "Generate on‑brand subject lines and message suggestions with the Chatgpt ",
     },
     {
       icon: BarChart3,
