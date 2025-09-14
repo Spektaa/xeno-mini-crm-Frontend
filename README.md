@@ -1,12 +1,133 @@
-# React + Vite
+# Xeno Mini-CRM – Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the **frontend** of the Mini-CRM Platform built for the **Xeno SDE Internship Assignment – 2025**.
+It enables customer segmentation, campaign creation, and AI-powered insights with a clean, modern UI.
 
-Currently, two official plugins are available:
+🌐 **Live Demo (Vercel):** \[Your Vercel URL here]
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## 🚀 Features
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+* **Authentication** – Secure login with Clerk (Google OAuth).
+* **Customer & Order Ingestion** – Upload via CSV or add single entries.
+* **Dynamic Campaign Builder** – Create audience segments using flexible rules (spend, visits, activity, etc.).
+* **Audience Preview** – Estimate campaign reach before saving.
+* **Campaign History** – View past campaigns, delivery stats, and statuses.
+* **AI Integration** –
+
+  * Convert natural language to segment rules.
+  * Generate campaign message suggestions.
+
+---
+
+## 🛠 Tech Stack
+
+* **Framework:** React + Vite
+* **Styling:** Tailwind CSS + shadcn/ui + lucide-react icons
+* **Auth:** Clerk (Google OAuth 2.0)
+* **Deployment:** Vercel
+* **APIs:** Express.js + MongoDB backend (see `/backend` repo)
+
+---
+
+## 📦 Folder Structure
+
+```
+frontend/
+├── public/            # Static assets
+├── src/
+│   ├── components/    # Reusable UI components (Navbar, Footer, Cards, etc.)
+│   ├── pages/         # Page-level components (Landing, Campaigns, Dashboard, etc.)
+│   ├── utils/         # Helper functions (formatters, constants)
+│   ├── App.jsx        # App entry point with routes
+│   └── main.jsx       # React DOM bootstrap
+├── package.json
+└── vite.config.js
+```
+
+---
+
+## ⚙️ Local Setup
+
+1. Clone the repo and move into the frontend folder:
+
+   ```bash
+   git clone https://github.com/your-username/xeno-mini-crm.git
+   cd xeno-mini-crm/frontend
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env.local` file:
+
+   ```env
+   VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key
+   VITE_API_BASE=http://localhost:8000/api/v1
+   ```
+
+4. Run locally:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open in browser:
+
+   ```
+   http://localhost:5173
+   ```
+
+---
+
+## 🔗 Deployment
+
+This frontend is deployed on **Vercel**.
+Every push to the `main` branch auto-deploys a new version.
+
+Steps (if redeploying):
+
+1. Connect repo to Vercel dashboard.
+2. Add environment variables in **Vercel → Project Settings → Environment Variables**.
+3. Trigger deployment (manual or auto via GitHub).
+
+---
+
+## 📐 Architecture
+
+```mermaid
+flowchart LR
+  subgraph Frontend [React + Vercel]
+    UI[Campaign UI + Forms]
+    Clerk[Clerk Auth]
+  end
+
+  subgraph Backend [Express + MongoDB]
+    API[REST APIs: Customers, Orders, Campaigns]
+    Vendor[Dummy Vendor API]
+    Logs[Delivery Logs]
+  end
+
+  UI -->|Fetch/Send| API
+  Clerk --> UI
+  API --> Vendor
+  Vendor --> Logs
+```
+
+---
+
+## ⚠️ Known Limitations
+
+* Bulk uploads require properly formatted CSVs (see sample in `/samples`).
+* AI features rely on OpenAI API – ensure correct API key is set in backend.
+* Campaign delivery is simulated (\~90% SENT / \~10% FAILED).
+
+---
+
+## ✨ Author
+
+Built with ❤️ by **Anmol Singh** for the **Xeno SDE Internship 2025 Assignment**.

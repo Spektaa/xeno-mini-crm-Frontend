@@ -123,30 +123,20 @@ function RecentCampaigns() {
         <thead className="bg-zinc-900/50 text-zinc-400">
           <tr>
             <th className="text-left px-4 py-3 font-medium">Name</th>
-            <th className="text-left px-4 py-3 font-medium">Segment</th>
+            {/* <th className="text-left px-4 py-3 font-medium">Segment</th> */}
             <th className="text-left px-4 py-3 font-medium">Status</th>
-            <th className="text-right px-4 py-3 font-medium">Sent</th>
-            <th className="text-right px-4 py-3 font-medium">CTR</th>
+            {/* <th className="text-right px-4 py-3 font-medium">Sent</th>
+            <th className="text-right px-4 py-3 font-medium">CTR</th> */}
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-800">
           {rows.map((c) => (
             <tr key={c._id} className="hover:bg-zinc-900/30">
               <td className="px-4 py-3">{c.name}</td>
-              <td className="px-4 py-3 text-zinc-400">
-                {c.segmentLabel ||
-                  (c.segmentRules?.totalSpend?.$gte
-                    ? `totalSpend ≥ ₹${nf.format(c.segmentRules.totalSpend.$gte)}`
-                    : "custom rules")}
-              </td>
               <td className="px-4 py-3">
                 <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(c.status ?? "draft")}`}>
                   {c.status ?? "draft"}
                 </span>
-              </td>
-              <td className="px-4 py-3 text-right">{fmt(c.sent)}</td>
-              <td className="px-4 py-3 text-right">
-                {typeof c.ctr === "number" ? `${c.ctr}%` : c.ctr ?? "—"}
               </td>
             </tr>
           ))}

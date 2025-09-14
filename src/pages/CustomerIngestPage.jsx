@@ -1,7 +1,6 @@
-// src/pages/IngestPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { useSearchParams } from "react-router-dom";
+
 
 // ===== Theme: dark + emerald accents =====
 const card = "rounded-2xl border border-zinc-800 bg-zinc-900/40";
@@ -192,7 +191,7 @@ const handleBulkUpload = async () => {
     fd.append("file", file);
     const token = await getToken().catch(() => null);
     const res = await fetch(
-      `https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/${entity}/bulk${dryRun ? "?dryRun=1" : ""}`,
+      `https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/customers/bulk${dryRun ? "?dryRun=1" : ""}`,
       {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
