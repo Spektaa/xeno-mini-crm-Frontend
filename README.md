@@ -35,14 +35,34 @@ It enables customer segmentation, campaign creation, and AI-powered insights wit
 
 ```
 frontend/
-├── public/            # Static assets
+├── node_modules/
+├── public/
 ├── src/
-│   ├── components/    # Reusable UI components (Navbar, Footer, Cards, etc.)
-│   ├── pages/         # Page-level components (Landing, Campaigns, Dashboard, etc.)
-│   ├── utils/         # Helper functions (formatters, constants)
-│   ├── App.jsx        # App entry point with routes
-│   └── main.jsx       # React DOM bootstrap
+│   ├── components/
+│   │   ├── button.jsx
+│   │   ├── CampaignHistory.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Navbar.jsx
+│   │   └── StatCard.jsx
+│   ├── pages/
+│   │   ├── CampaignUI.jsx
+│   │   ├── CustomerIngestPage.jsx
+│   │   ├── Dashboard.jsx
+│   │   └── Landing_Page.jsx
+│   ├── utils/
+│   │   ├── apifetch.js
+│   │   └── getauthheaders.js
+│   ├── App.css
+│   ├── App.jsx
+│   ├── index.css
+│   └── main.jsx
+├── .env
+├── .gitignore
+├── eslint.config.js
+├── index.html
+├── package-lock.json
 ├── package.json
+├── README.md
 └── vite.config.js
 ```
 
