@@ -3,7 +3,7 @@
 This is the **frontend** of the Mini-CRM Platform built for the **Xeno SDE Internship Assignment – 2025**.
 It enables customer segmentation, campaign creation, and AI-powered insights with a clean, modern UI.
 
-🌐 **Live Demo (Vercel):** \[Your Vercel URL here]
+🌐 **Live Demo (Vercel):** \[https://xeno-mini-crm-frontend-rust.vercel.app/]
 
 ---
 
