@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { SignedIn, SignedOut, RedirectToSignIn, useAuth } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { Plus, BarChart3, Users, Send, ChevronRight } from "lucide-react";
+import { Plus, BarChart3, Users, Send, ChevronRight, UserPlus, ShoppingCart } from "lucide-react";
 import { StatCard } from "../components/StatCard";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
@@ -171,6 +171,20 @@ export default function Dashboard() {
               <p className="mt-2 text-zinc-400">Overview of your audience and recent campaigns.</p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-2">
+                 <Link to="/ingest?tab=customers">
+                   <Button className="h-11 px-4 bg-zinc-800 hover:bg-zinc-700 flex items-center gap-2">
+                     <UserPlus className="h-4 w-4" />
+                     Add Customers
+                   </Button>
+                 </Link>
+                 <Link to="/ingest?tab=orders">
+                   <Button className="h-11 px-4 bg-zinc-800 hover:bg-zinc-700 flex items-center gap-2">
+                     <ShoppingCart className="h-4 w-4" />
+                     Add Orders
+                   </Button>
+                 </Link>
+               </div>
               <Link to="/campaigns">
                 <Button className="h-11 px-5 bg-emerald-500 hover:bg-emerald-600 flex items-center gap-2">
                   <Plus className="h-4 w-4" />
