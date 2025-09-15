@@ -284,9 +284,9 @@ function CreateCampaign() {
         },
       });
       const list = Array.isArray(res?.variants) ? res.variants : [];
-      const top2 = list.slice(0, 2);
-      setAiVariants(top2);
-      return top2;
+      const top3 = list.slice(0, 3);
+      setAiVariants(top3);
+      return top3;
     } catch (e) {
       setAiError(e.message || "Failed to get suggestions");
       setAiVariants([]);
