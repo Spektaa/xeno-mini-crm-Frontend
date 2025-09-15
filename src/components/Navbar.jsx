@@ -13,12 +13,6 @@ export function Navbar() {
           </div>
           <span className="font-semibold tracking-tight">Xeno Campaigns</span>
         </div>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-zinc-300">
-          <a href="#features" className="hover:text-white transition">Features</a>
-          <a href="#how-it-works" className="hover:text-white transition">How it works</a>
-          <a href="#pricing" className="hover:text-white transition">Pricing</a>
-          <a href="#faq" className="hover:text-white transition">FAQ</a>
-        </nav>
         <div className="flex items-center gap-3">
           <SignedOut>
             <SignInButton mode="modal">
