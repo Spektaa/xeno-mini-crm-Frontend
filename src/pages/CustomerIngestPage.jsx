@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 
-
 // ===== Theme: dark + emerald accents =====
 const card = "rounded-2xl border border-zinc-800 bg-zinc-900/40";
 const inputC =
@@ -105,6 +104,7 @@ export default function IngestPage() {
         <div className="mt-6">
           {tab === "customers" ? (
             <EntityPanel
+              key="customers"                // ★ isolate state for customers tab
               entity="customers"
               headers={CUSTOMER_HEADERS}
               templateRows={[
@@ -132,6 +132,7 @@ export default function IngestPage() {
             />
           ) : (
             <EntityPanel
+              key="orders"                   // ★ isolate state for orders tab
               entity="orders"
               headers={ORDER_HEADERS}
               templateRows={[
@@ -181,149 +182,160 @@ function EntityPanel({ entity, headers, templateRows, getToken, SingleForm }) {
       `${entity}_template.csv`
     );
 
-const handleBulkUpload = async () => {
-  if (!file) return;
-  setLoading(true);
-  setSummary(null);
-  setErrors([]);
-  try {
-    const fd = new FormData();
-    fd.append("file", file);
-    const token = await getToken().catch(() => null);
-    const res = await fetch(
-      `https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/customers/bulk${dryRun ? "?dryRun=1" : ""}`,
-      {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
+  const handleBulkUpload = async () => {
+    if (!file) return;
+    setLoading(true);
+    setSummary(null);
+    setErrors([]);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const token = await getToken().catch(() => null);
+
+      // Route by entity (customers/bulk vs orders/bulk)
+      const path = entity === "customers" ? "customers/bulk" : "orders/bulk";
+      const res = await fetch(
+        `${API_BASE}/api/v1/${path}${dryRun ? "?dryRun=1" : ""}`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd,
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          data?.message ||
+          (entity === "orders" && res.status === 404
+            ? "Orders bulk route not implemented on server (/api/v1/orders/bulk)."
+            : "Upload failed");
+        throw new Error(msg);
       }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Upload failed");
 
-    setSummary(data.summary);
+      setSummary(data.summary);
 
-    // only keep problematic rows
-    const problemRows = (data.rows || data.errors || []).filter(
-      (r) => r.status !== "ok" && (r.issues?.length || r.message)
-    );
-    setErrors(problemRows);
-  } catch (err) {
-    setErrors([
-      {
-        row: "-",
-        key: "-",
-        issues: [{ path: "-", message: err.message }],
-      },
-    ]);
-  } finally {
-    setLoading(false);
-  }
-};
+      // only keep problematic rows
+      const problemRows = (data.rows || data.errors || []).filter(
+        (r) => r.status !== "ok" && (r.issues?.length || r.message)
+      );
+      setErrors(problemRows);
+    } catch (err) {
+      setErrors([
+        {
+          row: "-",
+          key: "-",
+          issues: [{ path: "-", message: err.message }],
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-return (
-  <div className="grid gap-6">
-    {/* Single */}
-    <div className={`${card} p-5`}>
-      <h3 className="text-lg font-medium capitalize">{entity} – single entry</h3>
-      <p className="text-sm text-zinc-400">
-        Submit one record at a time. Required/optional fields depend on your
-        server validator.
-      </p>
-      <div className="mt-4">
-        <SingleForm />
-      </div>
-    </div>
-
-    {/* Bulk */}
-    <div className={`${card} p-5`}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-medium capitalize">{entity} – bulk CSV upload</h3>
-          <p className="text-sm text-zinc-400">
-            Headers (case-insensitive): {headers.join(", ")}
-          </p>
+  return (
+    <div className="grid gap-6">
+      {/* Single */}
+      <div className={`${card} p-5`}>
+        <h3 className="text-lg font-medium capitalize">{entity} – single entry</h3>
+        <p className="text-sm text-zinc-400">
+          Submit one record at a time. Required/optional fields depend on your
+          server validator.
+        </p>
+        <div className="mt-4">
+          <SingleForm />
         </div>
-        <button onClick={handleDownloadTemplate} className={btnGhost}>
-          Download template
-        </button>
       </div>
 
-      <div className="mt-4 grid gap-4">
-        <label className="block">
-          <span className="text-sm text-zinc-300">CSV file</span>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mt-1 block w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-900/60 p-2 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-zinc-200"
-          />
-        </label>
-
-        <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={dryRun}
-            onChange={(e) => setDryRun(e.target.checked)}
-          />
-          Dry run (validate only; don’t write)
-        </label>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            disabled={!file || loading}
-            onClick={handleBulkUpload}
-            className={btnPrimary}
-          >
-            {loading ? "Uploading..." : "Upload"}
+      {/* Bulk */}
+      <div className={`${card} p-5`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-medium capitalize">{entity} – bulk CSV upload</h3>
+            <p className="text-sm text-zinc-400">
+              Headers (case-insensitive): {headers.join(", ")}
+            </p>
+          </div>
+          <button onClick={handleDownloadTemplate} className={btnGhost}>
+            Download template
           </button>
-          {summary && (
-            <span className="text-sm text-zinc-300">
-              Received: <b>{summary.received}</b> • Accepted:{" "}
-              <b>{summary.accepted}</b> • Inserted: <b>{summary.inserted}</b> •
-              Duplicates: <b>{summary.duplicates}</b> • Rejected:{" "}
-              <b>{summary.rejected}</b>
-            </span>
+        </div>
+
+        <div className="mt-4 grid gap-4">
+          <label className="block">
+            <span className="text-sm text-zinc-300">CSV file</span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="mt-1 block w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-900/60 p-2 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-zinc-200"
+            />
+          </label>
+
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={dryRun}
+              onChange={(e) => setDryRun(e.target.checked)}
+            />
+            Dry run (validate only; don’t write)
+          </label>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              disabled={!file || loading}
+              onClick={handleBulkUpload}
+              className={btnPrimary}
+            >
+              {loading ? "Uploading..." : "Upload"}
+            </button>
+            {summary && (
+              <span className="text-sm text-zinc-300">
+                Received: <b>{summary.received}</b> • Accepted:{" "}
+                <b>{summary.accepted}</b> • Inserted: <b>{summary.inserted}</b> •
+                Duplicates: <b>{summary.duplicates}</b> • Rejected:{" "}
+                <b>{summary.rejected}</b>
+              </span>
+            )}
+          </div>
+
+          {errors.length > 0 && (
+            <div className="mt-2 rounded-xl border border-rose-900/50 bg-rose-950/30 p-3">
+              <p className="mb-2 text-rose-300 font-medium">Row errors</p>
+              <ul className="space-y-2 text-sm">
+                {errors.map((e, i) => (
+                  <li
+                    key={i}
+                    className="rounded-lg border border-rose-900/40 bg-rose-950/20 p-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-rose-400">Row {e.row}</span>
+                      <span className="text-zinc-400">Key: {e.key || "—"}</span>
+                      {e.status && (
+                        <span className="text-zinc-500">({e.status})</span>
+                      )}
+                    </div>
+                    <ul className="mt-1 list-disc pl-6 text-rose-200">
+                      {e.issues?.length
+                        ? e.issues.map((iss, j) => (
+                            <li key={j}>
+                              <span className="text-zinc-300">{iss.path}:</span>{" "}
+                              {iss.message}
+                            </li>
+                          ))
+                        : e.message
+                        ? <li>{e.message}</li>
+                        : null}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
-
-        {errors.length > 0 && (
-          <div className="mt-2 rounded-xl border border-rose-900/50 bg-rose-950/30 p-3">
-            <p className="mb-2 text-rose-300 font-medium">Row errors</p>
-            <ul className="space-y-2 text-sm">
-              {errors.map((e, i) => (
-                <li
-                  key={i}
-                  className="rounded-lg border border-rose-900/40 bg-rose-950/20 p-2"
-                >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-rose-400">Row {e.row}</span>
-                    <span className="text-zinc-400">Key: {e.key || "—"}</span>
-                    {e.status && (
-                      <span className="text-zinc-500">({e.status})</span>
-                    )}
-                  </div>
-                  <ul className="mt-1 list-disc pl-6 text-rose-200">
-                    {e.issues?.length
-                      ? e.issues.map((iss, j) => (
-                          <li key={j}>
-                            <span className="text-zinc-300">{iss.path}:</span>{" "}
-                            {iss.message}
-                          </li>
-                        ))
-                      : e.message
-                      ? <li>{e.message}</li>
-                      : null}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 /* ---------- Single Forms ---------- */
@@ -446,9 +458,10 @@ function OrderForm() {
       if (!debounced) { setSuggestions([]); return; }
       try {
         const token = await getToken().catch(() => null);
-        const res = await fetch(`https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/customersearch/search?q=${encodeURIComponent(debounced)}`, {
-          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        });
+        const res = await fetch(
+          `${API_BASE}/api/v1/customersearch/search?q=${encodeURIComponent(debounced)}`,
+          { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } }
+        );
         const data = await res.json();
         if (!aborted) setSuggestions(Array.isArray(data?.data) ? data.data : []);
         setOpen(true);
@@ -484,7 +497,7 @@ function OrderForm() {
     if (!v) return undefined; // let backend default to now
     const d = new Date(v);
     return isNaN(d.getTime()) ? undefined : d.toISOString();
-    };
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -505,7 +518,7 @@ function OrderForm() {
         orderDate: toISOFromDatetimeLocal(form.orderDate), // optional
       };
 
-      const res = await fetch("https://xeno-mini-crm-backend-4vjf.onrender.com/api/v1/orders", {
+      const res = await fetch(`${API_BASE}/api/v1/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -562,7 +575,6 @@ function OrderForm() {
             </ul>
           )}
         </div>
-        {/* show selection state */}
         {!!form.customer && (
           <div className="text-xs text-emerald-400">Selected customer id: {form.customer}</div>
         )}
